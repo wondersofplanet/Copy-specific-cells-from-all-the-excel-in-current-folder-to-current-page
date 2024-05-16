@@ -1,0 +1,105 @@
+Sub CopyDataFromOtherExcels()
+    Dim currentWB As Workbook
+    Dim currentWS As Worksheet
+    Dim currentPath As String
+    Dim currentFile As String
+    Dim dataRange As Range
+    Dim targetCell As Range
+    Dim cell As Range
+    Dim rowCount As Long
+    Dim colCount As Long
+    Dim sourceRowOffset As Long
+    Dim sourceColOffset As Long
+    Dim targetRowOffset As Long
+    Dim targetColOffset As Long
+    Dim lastRow As Long
+    Dim lastColumn As Long
+    Dim nextAvailableRow As Long
+    Dim copyWithFormat As Boolean
+    
+    On Error GoTo ErrorHandler
+    
+    ' Set flag to determine whether to copy with formatting
+    copyWithFormat = True ' Change to False to disable copying with formatting
+    
+    ' Set current workbook and worksheet
+    Set currentWB = ThisWorkbook
+    Set currentWS = currentWB.ActiveSheet
+    
+    ' Set current directory path
+    currentPath = ThisWorkbook.Path
+    
+    ' Find next available row and column in current worksheet
+    lastRow = currentWS.Cells(currentWS.Rows.Count, "A").End(xlUp).Row
+    lastColumn = currentWS.Cells(1, currentWS.Columns.Count).End(xlToLeft).Column
+    
+    ' Calculate the next available row
+    If lastRow = 1 And lastColumn = 1 And IsEmpty(currentWS.Cells(1, 1)) Then
+        nextAvailableRow = 1
+    Else
+        nextAvailableRow = lastRow + 1
+    End If
+    
+    ' Set target cell
+    Set targetCell = currentWS.Cells(nextAvailableRow, "A")
+    
+ 
+    ' Loop through Excel files in current directory
+    currentFile = Dir(currentPath & "\*.xls*")
+    Do While currentFile <> ""
+        ' Skip the current workbook
+        If currentFile <> currentWB.Name Then
+            ' Open the workbook
+            Workbooks.Open Filename:=currentPath & "\" & currentFile
+            ' Set data range from the specified cells
+            Set dataRange = Workbooks(currentFile).ActiveSheet.Range("A1,A4,A5,C2,C3,D3,C4,D4,D5,C5,C6")
+            
+            ' Check if data range is empty
+            If Not dataRange Is Nothing Then
+                ' Get the size of the data range
+                rowCount = dataRange.Rows.Count
+                colCount = dataRange.Columns.Count
+                
+                ' Calculate row and column offsets for the target range
+                sourceRowOffset = dataRange.Cells(1).Row - 1
+                sourceColOffset = dataRange.Cells(1).Column - 1
+                targetRowOffset = targetCell.Row - 1
+                targetColOffset = targetCell.Column - 1
+                
+                ' Copy data to target range
+                For Each cell In dataRange
+                    currentWS.Cells(cell.Row + targetRowOffset - sourceRowOffset, cell.Column + targetColOffset - sourceColOffset).Value = cell.Value
+                    If copyWithFormat Then
+                        ' Copy formatting
+                        cell.Copy
+                        currentWS.Cells(cell.Row + targetRowOffset - sourceRowOffset, cell.Column + targetColOffset - sourceColOffset).PasteSpecial Paste:=xlPasteFormats
+                        ' Copy color
+                        currentWS.Cells(cell.Row + targetRowOffset - sourceRowOffset, cell.Column + targetColOffset - sourceColOffset).Interior.Color = cell.Interior.Color
+                    End If
+                Next cell
+                
+                ' Move target cell to the next available position
+                Set targetCell = currentWS.Cells(nextAvailableRow + rowCount, "A")
+            End If
+            
+            ' Close the opened workbook without saving changes
+            Workbooks(currentFile).Close SaveChanges:=False
+            
+            ' Calculate the next available row for the next iteration
+            nextAvailableRow = currentWS.Cells(currentWS.Rows.Count, "A").End(xlUp).Row + 2 ' Add an extra row for an empty line
+            ' Set target cell for the next iteration
+            Set targetCell = currentWS.Cells(nextAvailableRow, "A")
+        End If
+        ' Move to the next file
+        currentFile = Dir
+    Loop
+    
+    ' Autofit columns
+    currentWS.Columns.AutoFit
+    
+    Exit Sub
+    
+ErrorHandler:
+    MsgBox "An error occurred: " & Err.Description, vbExclamation
+End Sub
+
